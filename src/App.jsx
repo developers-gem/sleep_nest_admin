@@ -38,10 +38,12 @@ export default function App() {
       ]);
       setProducts(prods);
       setOrders(ords);
+
       setStats({
         ...st,
         productCount: prods.length,
       });
+
     } catch (err) {
       console.error('Error loading data:', err);
     } finally {
@@ -52,7 +54,6 @@ export default function App() {
   useEffect(() => {
     loadData();
   }, []);
-
   // Product Actions
   const handleSaveProduct = async (productData, existingId) => {
     if (existingId) {

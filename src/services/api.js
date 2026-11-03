@@ -1,4 +1,5 @@
-const API_BASE = 'http://localhost:3000/api';
+//const API_BASE = 'http://localhost:3000/api';
+const API_BASE = 'https://sleep-nest-backend.onrender.com/api';
 
 // Fallback demo data if backend has 0 records initially
 const DEMO_PRODUCTS = [
