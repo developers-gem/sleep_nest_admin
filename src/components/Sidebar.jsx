@@ -42,7 +42,7 @@ export default function Sidebar({ currentTab, setCurrentTab, stats }) {
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = currentTab === item.id;
-          return (
+          return(
             <button
               key={item.id}
               onClick={() => setCurrentTab(item.id)}

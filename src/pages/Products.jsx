@@ -135,12 +135,25 @@ export default function Products({ products, onAddClick, onEditClick, onDeleteCl
 
                       {/* Price */}
                       <td className="py-4 px-5">
-                        <div className="font-bold text-slate-900">
-                          ₹{Number(product.price || 0).toLocaleString('en-IN')}
-                        </div>
-                        {product.originalPrice && product.originalPrice > product.price && (
-                          <div className="text-xs text-slate-400 line-through">
-                            ₹{Number(product.originalPrice).toLocaleString('en-IN')}
+                        {product.sizeVariants && product.sizeVariants.length > 1 ? (
+                          <div>
+                            <div className="font-bold text-slate-900">
+                              ₹{Math.min(...product.sizeVariants.map(v => Number(v.price || 0))).toLocaleString('en-IN')} - ₹{Math.max(...product.sizeVariants.map(v => Number(v.price || 0))).toLocaleString('en-IN')}
+                            </div>
+                            <div className="text-[11px] text-emerald-600 font-medium">
+                              {product.sizeVariants.length} sizes configured
+                            </div>
+                          </div>
+                        ) : (
+                          <div>
+                            <div className="font-bold text-slate-900">
+                              ₹{Number(product.price || 0).toLocaleString('en-IN')}
+                            </div>
+                            {product.originalPrice && product.originalPrice > product.price && (
+                              <div className="text-xs text-slate-400 line-through">
+                                ₹{Number(product.originalPrice).toLocaleString('en-IN')}
+                              </div>
+                            )}
                           </div>
                         )}
                       </td>

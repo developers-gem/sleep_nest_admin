@@ -214,7 +214,7 @@ export const api = {
         body: JSON.stringify(productData),
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.message || 'Failed to create product');
+      if(!res.ok) throw new Error(json.message || 'Failed to create product');
       return json.data;
     } catch (e) {
       console.warn('Server create failed or offline, saving to local store:', e.message);

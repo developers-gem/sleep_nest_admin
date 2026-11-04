@@ -4,11 +4,33 @@ import {
   Save, 
   Image as ImageIcon, 
   Plus, 
-  X, 
+  Trash2, 
   AlertCircle,
   CheckCircle2,
-  Sparkles
+  Sparkles,
+  Layers
 } from 'lucide-react';
+
+const SIZE_PRESETS = {
+  mattress: [
+    { size: 'Single (72" x 36")', price: '9999', originalPrice: '12999' },
+    { size: 'Queen (78" x 60")', price: '14999', originalPrice: '18999' },
+    { size: 'King (78" x 72")', price: '18999', originalPrice: '24999' },
+  ],
+  pillow: [
+    { size: 'Standard (18" x 27")', price: '1499', originalPrice: '1999' },
+    { size: 'Queen (20" x 30")', price: '1999', originalPrice: '2599' },
+    { size: 'King (20" x 36")', price: '2499', originalPrice: '3299' },
+  ],
+  bedding: [
+    { size: 'Single Bed (60" x 90")', price: '2999', originalPrice: '3999' },
+    { size: 'Double / Queen (90" x 100")', price: '4499', originalPrice: '5999' },
+    { size: 'King (108" x 108")', price: '5999', originalPrice: '7999' },
+  ],
+  accessories: [
+    { size: 'Standard Size', price: '999', originalPrice: '1499' },
+  ],
+};
 
 export default function AddProduct({ productToEdit, onSave, onCancel }) {
   const isEditing = Boolean(productToEdit);
@@ -24,11 +46,11 @@ export default function AddProduct({ productToEdit, onSave, onCancel }) {
     description: '',
     image: '',
     imagesText: '',
-    sizesText: 'King (78x72), Queen (78x60), Single (78x36)',
     isBestSeller: false,
     isNewArrival: true,
   });
 
+  const [sizeVariants, setSizeVariants] = useState(SIZE_PRESETS.mattress);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
@@ -39,19 +61,84 @@ export default function AddProduct({ productToEdit, onSave, onCancel }) {
         name: productToEdit.name || '',
         brand: productToEdit.brand || 'SleepNest',
         category: productToEdit.category || 'mattress',
-        price: productToEdit.price || '',
-        originalPrice: productToEdit.originalPrice || '',
+        price: productToEdit.price !== undefined ? String(productToEdit.price) : '',
+        originalPrice: productToEdit.originalPrice !== undefined ? String(productToEdit.originalPrice) : '',
         stock: productToEdit.stock !== undefined ? productToEdit.stock : 20,
         material: productToEdit.material || '',
         description: productToEdit.description || '',
         image: productToEdit.image || '',
         imagesText: (productToEdit.images || []).join('\n'),
-        sizesText: (productToEdit.sizes || []).join(', '),
         isBestSeller: Boolean(productToEdit.isBestSeller),
         isNewArrival: Boolean(productToEdit.isNewArrival),
       });
+
+      // Load sizeVariants if present
+      if (Array.isArray(productToEdit.sizeVariants) && productToEdit.sizeVariants.length > 0) {
+        setSizeVariants(
+          productToEdit.sizeVariants.map(v => ({
+            size: v.size || '',
+            price: v.price !== undefined ? String(v.price) : '',
+            originalPrice: v.originalPrice !== undefined ? String(v.originalPrice) : '',
+          }))
+        );
+      } else if (Array.isArray(productToEdit.sizes) && productToEdit.sizes.length > 0) {
+        setSizeVariants(
+          productToEdit.sizes.map(s => ({
+            size: s,
+            price: productToEdit.price !== undefined ? String(productToEdit.price) : '',
+            originalPrice: productToEdit.originalPrice !== undefined ? String(productToEdit.originalPrice) : '',
+          }))
+        );
+      }
     }
   }, [productToEdit]);
+
+  // Update a specific size variant field
+  const handleVariantChange = (index, field, value) => {
+    const updated = [...sizeVariants];
+    updated[index] = { ...updated[index], [field]: value };
+    setSizeVariants(updated);
+
+    // If changing price of the first variant and form.price is empty or matched, sync base price
+    if (index === 0 && field === 'price') {
+      setForm(prev => ({ ...prev, price: value }));
+    }
+    if (index === 0 && field === 'originalPrice') {
+      setForm(prev => ({ ...prev, originalPrice: value }));
+    }
+  };
+
+  const handleAddVariant = () => {
+    setSizeVariants([
+      ...sizeVariants,
+      { size: '', price: form.price || '', originalPrice: form.originalPrice || '' },
+    ]);
+  };
+
+  const handleRemoveVariant = (index) => {
+    if (sizeVariants.length <= 1) return;
+    const updated = sizeVariants.filter((_, i) => i !== index);
+    setSizeVariants(updated);
+  };
+
+  const handleLoadPreset = (cat) => {
+    const preset = SIZE_PRESETS[cat] || SIZE_PRESETS.mattress;
+    setSizeVariants(preset);
+    if (preset.length > 0) {
+      setForm(prev => ({
+        ...prev,
+        price: preset[0].price,
+        originalPrice: preset[0].originalPrice,
+      }));
+    }
+  };
+
+  const handleCategoryChange = (newCat) => {
+    setForm(prev => ({ ...prev, category: newCat }));
+    if (!isEditing) {
+      handleLoadPreset(newCat);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -61,8 +148,24 @@ export default function AddProduct({ productToEdit, onSave, onCancel }) {
       setError('Product name is required');
       return;
     }
-    if (!form.price || Number(form.price) <= 0) {
-      setError('Please provide a valid price');
+
+    // Validate size variants
+    const validVariants = sizeVariants
+      .filter(v => v.size && v.size.trim().length > 0)
+      .map(v => ({
+        size: v.size.trim(),
+        price: Number(v.price) || 0,
+        originalPrice: v.originalPrice ? Number(v.originalPrice) : undefined,
+      }));
+
+    if (validVariants.length === 0) {
+      setError('At least one size variant with a name and price is required');
+      return;
+    }
+
+    const hasInvalidPrice = validVariants.some(v => v.price <= 0);
+    if (hasInvalidPrice) {
+      setError('Every size variant must have a valid selling price greater than 0');
       return;
     }
 
@@ -80,26 +183,27 @@ export default function AddProduct({ productToEdit, onSave, onCancel }) {
         images.unshift(form.image.trim());
       }
 
-      // Split sizes
-      const sizes = form.sizesText
-        .split(',')
-        .map(s => s.trim())
-        .filter(s => s.length > 0);
+      // Determine lowest base price
+      const minPrice = Math.min(...validVariants.map(v => v.price));
+      const firstVariant = validVariants[0];
 
       const payload = {
         name: form.name.trim(),
         brand: form.brand.trim() || 'SleepNest',
         category: form.category.toLowerCase(),
-        price: Number(form.price),
-        originalPrice: form.originalPrice ? Number(form.originalPrice) : undefined,
-        discountPrice: form.originalPrice ? Number(form.price) : undefined,
+        price: Number(form.price) > 0 ? Number(form.price) : minPrice,
+        originalPrice: form.originalPrice
+          ? Number(form.originalPrice)
+          : (firstVariant.originalPrice || undefined),
+        discountPrice: Number(form.price) > 0 ? Number(form.price) : minPrice,
         stock: Number(form.stock) || 0,
         inStock: Number(form.stock) > 0,
         material: form.material.trim(),
         description: form.description.trim(),
         image: form.image.trim() || (images[0] || ''),
         images: images,
-        sizes: sizes,
+        sizes: validVariants.map(v => v.size),
+        sizeVariants: validVariants,
         isBestSeller: form.isBestSeller,
         isNewArrival: form.isNewArrival,
       };
@@ -147,7 +251,7 @@ export default function AddProduct({ productToEdit, onSave, onCancel }) {
               {isEditing ? 'Edit Product Details' : 'Add New Product to SleepNest'}
             </h2>
             <p className="text-xs text-slate-500">
-              Fill in product specifications, pricing, inventory stock and image URLs.
+              Configure product specifications, size-specific pricing, inventory stock and image URLs.
             </p>
           </div>
           <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
@@ -165,7 +269,7 @@ export default function AddProduct({ productToEdit, onSave, onCancel }) {
         {success && (
           <div className="mx-6 mt-6 p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm flex items-center gap-3">
             <CheckCircle2 className="w-5 h-5 shrink-0 text-emerald-600" />
-            <span>Product saved successfully! Returning to catalog...</span>
+            <span>Product saved successfully with size-based pricing! Returning to catalog...</span>
           </div>
         )}
 
@@ -200,7 +304,7 @@ export default function AddProduct({ productToEdit, onSave, onCancel }) {
             </div>
           </div>
 
-          {/* 2. Category & Pricing & Stock */}
+          {/* 2. Category & Base/Starting Pricing & Stock */}
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-5">
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
@@ -208,7 +312,7 @@ export default function AddProduct({ productToEdit, onSave, onCancel }) {
               </label>
               <select
                 value={form.category}
-                onChange={(e) => setForm({ ...form, category: e.target.value })}
+                onChange={(e) => handleCategoryChange(e.target.value)}
                 className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 capitalize font-medium"
               >
                 <option value="mattress">Mattress</option>
@@ -220,7 +324,7 @@ export default function AddProduct({ productToEdit, onSave, onCancel }) {
 
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                Selling Price (₹) <span className="text-red-500">*</span>
+                Base / Starting Price (₹) <span className="text-red-500">*</span>
               </label>
               <input
                 type="number"
@@ -234,7 +338,7 @@ export default function AddProduct({ productToEdit, onSave, onCancel }) {
 
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                MRP / Original Price (₹)
+                Base MRP / Original (₹)
               </label>
               <input
                 type="number"
@@ -259,7 +363,103 @@ export default function AddProduct({ productToEdit, onSave, onCancel }) {
             </div>
           </div>
 
-          {/* 3. Image URL & Live Preview */}
+          {/* 3. SIZE-SPECIFIC PRICING MANAGER (KEY FEATURE) */}
+          <div className="space-y-3 bg-slate-50/80 p-5 rounded-2xl border border-slate-200">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <label className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                  <Layers className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Size Variants & Pricing</span>
+                  <span className="text-red-500">*</span>
+                </label>
+                <p className="text-xs text-slate-500">
+                  Define custom selling prices and MRPs for each size option.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleLoadPreset(form.category)}
+                  className="px-2.5 py-1 text-xs font-semibold text-emerald-700 bg-emerald-100 hover:bg-emerald-200 rounded-lg transition-colors"
+                >
+                  Load {form.category} presets
+                </button>
+                <button
+                  type="button"
+                  onClick={handleAddVariant}
+                  className="flex items-center gap-1 px-3 py-1 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-lg transition-all shadow-sm"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Add Size</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-2.5 pt-1">
+              {sizeVariants.map((variant, idx) => (
+                <div 
+                  key={idx} 
+                  className="flex flex-col sm:flex-row gap-2.5 items-center bg-white p-3 rounded-xl border border-slate-200 shadow-xs"
+                >
+                  <div className="flex-1 w-full sm:w-auto">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                      Size Name / Dimensions
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. King (78x72)"
+                      value={variant.size}
+                      onChange={(e) => handleVariantChange(idx, 'size', e.target.value)}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                    />
+                  </div>
+
+                  <div className="w-full sm:w-40">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                      Selling Price (₹) <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      required
+                      placeholder="18999"
+                      value={variant.price}
+                      onChange={(e) => handleVariantChange(idx, 'price', e.target.value)}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-bold text-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                    />
+                  </div>
+
+                  <div className="w-full sm:w-40">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                      MRP / Original (₹)
+                    </label>
+                    <input
+                      type="number"
+                      placeholder="24999"
+                      value={variant.originalPrice}
+                      onChange={(e) => handleVariantChange(idx, 'originalPrice', e.target.value)}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                    />
+                  </div>
+
+                  <div className="pt-0 sm:pt-4 self-end sm:self-auto">
+                    <button
+                      type="button"
+                      disabled={sizeVariants.length <= 1}
+                      onClick={() => handleRemoveVariant(idx)}
+                      className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-slate-400"
+                      title="Remove Size"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* 4. Image URL & Live Preview */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
@@ -296,20 +496,8 @@ export default function AddProduct({ productToEdit, onSave, onCancel }) {
             </div>
           </div>
 
-          {/* 4. Sizes & Material */}
+          {/* 5. Material & Additional Images */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                Available Sizes (comma-separated)
-              </label>
-              <input
-                type="text"
-                placeholder="King (78x72), Queen (78x60), Single (78x36)"
-                value={form.sizesText}
-                onChange={(e) => setForm({ ...form, sizesText: e.target.value })}
-                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
-              />
-            </div>
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
                 Material & Composition
@@ -322,9 +510,21 @@ export default function AddProduct({ productToEdit, onSave, onCancel }) {
                 className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
               />
             </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                Additional Image URLs (one per line)
+              </label>
+              <textarea
+                rows="2"
+                placeholder="https://images.unsplash.com/photo-1...&#10;https://images.unsplash.com/photo-2..."
+                value={form.imagesText}
+                onChange={(e) => setForm({ ...form, imagesText: e.target.value })}
+                className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+              ></textarea>
+            </div>
           </div>
 
-          {/* 5. Description */}
+          {/* 6. Description */}
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
               Product Description
@@ -338,7 +538,7 @@ export default function AddProduct({ productToEdit, onSave, onCancel }) {
             ></textarea>
           </div>
 
-          {/* 6. Switches / Badges */}
+          {/* 7. Switches / Badges */}
           <div className="flex flex-wrap items-center gap-6 pt-2 border-t border-slate-100">
             <label className="flex items-center gap-2.5 cursor-pointer">
               <input
@@ -384,4 +584,3 @@ export default function AddProduct({ productToEdit, onSave, onCancel }) {
     </div>
   );
 }
-
